@@ -13,6 +13,8 @@ class Skill(models.Model):
     file_ipfs_hash = models.CharField(max_length=255)   # IPFS CID
     file_sha256 = models.CharField(max_length=64)        # proof hash
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='submitted')
+    tags = models.JSONField(default=list, blank=True)
+    skill_level = models.CharField(max_length=50, blank=True, default='')
     submitted_at = models.DateTimeField(auto_now_add=True)
 
 class Verification(models.Model):

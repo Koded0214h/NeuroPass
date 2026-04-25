@@ -180,3 +180,6 @@ STATIC_URL = 'static/'
 PINATA_JWT = os.getenv('PINATA_JWT', '')
 SOLANA_RPC = os.getenv('SOLANA_RPC', 'https://api.devnet.solana.com')
 WALLET_SECRET_KEY = os.getenv('WALLET_SECRET_KEY', '')
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', '')
+YARNGPT_API_URL = os.getenv('YARNGPT_API_URL', 'https://yarngpt.ai/api/v1')
+YARNGPT_API_KEY = os.getenv('YARNGPT_API_KEY', '')

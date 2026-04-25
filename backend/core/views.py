@@ -6,11 +6,12 @@ from .models import Skill, Verification, Credential
 from .serializers import SkillSerializer, SkillCreateSerializer, VerificationSerializer
 from .services import upload_to_ipfs, sha256_hash
 from .web3 import mint_credential_nft
+from .ai import generate_skill_analysis, text_to_speech_yarngpt
 
 ALLOWED_CONTENT_TYPES = {
     'video/mp4', 'video/webm', 'video/quicktime',
     'image/jpeg', 'image/png', 'image/gif',
-    'application/pdf',
+    'application/pdf', 'text/plain', 'application/zip',
 }
 MAX_FILE_BYTES = 50 * 1024 * 1024  # 50 MB
 
@@ -32,12 +33,69 @@ class SkillSubmitView(generics.CreateAPIView):
         content = file_obj.read()
         ipfs_hash = upload_to_ipfs(content, file_obj.name)
         proof = sha256_hash(content)
+        
+        # AI Analysis
+        name = self.request.data.get('name')
+        desc = self.request.data.get('description')
+        ai_data = generate_skill_analysis(name, desc)
+        
         serializer.save(
             user=self.request.user,
+            description=ai_data.get('refined_description', desc),
             file_ipfs_hash=ipfs_hash,
             file_sha256=proof,
             status='submitted',
+            tags=ai_data.get('tags', []),
+            skill_level=ai_data.get('level', 'Intermediate'),
         )
+
+
+class AudioDescriptionView(generics.GenericAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request, pk):
+        try:
+            skill = Skill.objects.get(pk=pk, user=request.user)
+        except Skill.DoesNotExist:
+            return Response({'error': 'Skill not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        audio_content = text_to_speech_yarngpt(skill.description)
+        if not audio_content:
+            return Response({'error': 'TTS generation failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        return Response(
+            audio_content, 
+            content_type='audio/mpeg',
+            headers={'Content-Disposition': f'attachment; filename="skill_{pk}.mp3"'}
+        )
+
+class PassportView(generics.RetrieveAPIView):
+    """
+    Consolidated view for Frontier Pass integration.
+    Returns the full "Verifiable Identity" of a user.
+    """
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        user = request.user
+        profile = user.profile
+        skills = Skill.objects.filter(user=user, status='verified').select_related('credential')
+        
+        serializer = SkillSerializer(skills, many=True)
+        
+        return Response({
+            'user': {
+                'username': user.username,
+                'email': user.email,
+                'wallet_address': profile.wallet_address,
+            },
+            'trust_metrics': {
+                'reputation_score': profile.reputation_score,
+                'is_verifier': profile.is_verifier,
+            },
+            'verified_skills': serializer.data,
+            'export_format': 'NeuroPass-v1',
+        })
 
 
 class SkillListView(generics.ListAPIView):
@@ -77,7 +135,14 @@ class VerificationView(generics.UpdateAPIView):
         if decision == 'approve':
             skill.status = 'verified'
             skill.save()
+
+            # Update verifier reputation
+            verifier_profile = request.user.profile
+            verifier_profile.reputation_score += 1.0
+            verifier_profile.save()
+
             try:
+
                 mint_addr, tx_sig, metadata_uri = mint_credential_nft(skill)
                 Credential.objects.create(
                     skill=skill,

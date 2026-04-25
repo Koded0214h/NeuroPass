@@ -72,7 +72,23 @@ def _upload_metadata_to_ipfs(metadata_json: str) -> str:
 
 def mint_credential_nft(skill):
     client = Client(settings.SOLANA_RPC)
-    minter = Keypair.from_bytes(bytes(json.loads(settings.WALLET_SECRET_KEY)))
+    
+    # Ultra-robust key parsing: Supports Base58 string or Byte Array
+    try:
+        raw_key = settings.WALLET_SECRET_KEY.strip()
+        if len(raw_key) > 64 and "[" not in raw_key and "," not in raw_key:
+            # Likely Base58 string
+            minter = Keypair.from_base58_string(raw_key)
+        else:
+            # Likely byte array
+            import re
+            numbers = re.findall(r'\d+', raw_key)
+            if len(numbers) < 64:
+                raise ValueError(f"Found only {len(numbers)} bytes, need 64.")
+            key_bytes = bytes([int(n) for n in numbers])
+            minter = Keypair.from_bytes(key_bytes)
+    except Exception as e:
+        raise ValueError(f"Could not parse WALLET_SECRET_KEY: {e}. Paste your full Phantom Private Key or 64-byte array.")
 
     metadata = {
         "name": f"NeuroPass: {skill.name}",
@@ -88,15 +104,25 @@ def mint_credential_nft(skill):
     meta_ipfs_hash = _upload_metadata_to_ipfs(json.dumps(metadata))
     metadata_uri = f"ipfs://{meta_ipfs_hash}"
 
+    from solders.system_program import create_account, CreateAccountParams
+
     mint_keypair = Keypair()
     mint_pubkey = mint_keypair.pubkey()
     minter_pubkey = minter.pubkey()
 
-    metadata_pda, _ = Pubkey.find_program_address(
-        [b"metadata", bytes(METADATA_PROGRAM_ID), bytes(mint_pubkey)],
-        METADATA_PROGRAM_ID,
+    # Get rent-exempt balance for a Mint account (82 bytes)
+    rent_resp = client.get_minimum_balance_for_rent_exemption(82)
+    lamports = rent_resp.value
+
+    create_mint_account_ix = create_account(
+        CreateAccountParams(
+            from_pubkey=minter_pubkey,
+            to_pubkey=mint_pubkey,
+            lamports=lamports,
+            space=82,
+            program_id=TOKEN_PROGRAM_ID,
+        )
     )
-    ata = get_associated_token_address(minter_pubkey, mint_pubkey)
 
     create_mint_ix = initialize_mint(
         InitializeMintParams(
@@ -107,6 +133,14 @@ def mint_credential_nft(skill):
             freeze_authority=minter_pubkey,
         )
     )
+    
+    # ... rest of derivation logic ...
+    metadata_pda, _ = Pubkey.find_program_address(
+        [b"metadata", bytes(METADATA_PROGRAM_ID), bytes(mint_pubkey)],
+        METADATA_PROGRAM_ID,
+    )
+    ata = get_associated_token_address(minter_pubkey, mint_pubkey)
+
     create_ata_ix = create_associated_token_account(
         payer=minter_pubkey,
         owner=minter_pubkey,
@@ -128,16 +162,21 @@ def mint_credential_nft(skill):
         mint_authority=minter_pubkey,
         payer=minter_pubkey,
         update_authority=minter_pubkey,
-        name=metadata["name"],
+        name=metadata["name"][:32],
         symbol=metadata["symbol"],
         uri=metadata_uri,
     )
 
     recent_bh = client.get_latest_blockhash().value.blockhash
     txn = Transaction(recent_blockhash=recent_bh, fee_payer=minter_pubkey)
-    txn.add(create_mint_ix, create_ata_ix, mint_to_ix, create_meta_ix)
+    txn.add(create_mint_account_ix)
+    txn.add(create_mint_ix)
+    txn.add(create_ata_ix)
+    txn.add(mint_to_ix)
+    txn.add(create_meta_ix)
 
-    response = client.send_transaction(txn, minter, mint_keypair, opts=TxOpts(skip_preflight=False))
+    # Sign with both the payer and the new mint account
+    response = client.send_transaction(txn, minter, mint_keypair)
     tx_signature = response.value
 
     return str(mint_pubkey), str(tx_signature), metadata_uri
