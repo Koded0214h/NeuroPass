@@ -6,6 +6,7 @@ from .models import Skill, Verification, Credential
 from .serializers import SkillSerializer, SkillCreateSerializer, VerificationSerializer
 from .services import upload_to_ipfs, sha256_hash
 from .web3 import mint_credential_nft
+from .anchor import anchor_credential_on_chain
 from .ai import generate_skill_analysis, text_to_speech_yarngpt
 
 ALLOWED_CONTENT_TYPES = {
@@ -142,6 +143,7 @@ class VerificationView(generics.UpdateAPIView):
             verifier_profile.save()
 
             try:
+                from solders.pubkey import Pubkey as SoldersPubkey
 
                 mint_addr, tx_sig, metadata_uri = mint_credential_nft(skill)
                 Credential.objects.create(
@@ -150,6 +152,23 @@ class VerificationView(generics.UpdateAPIView):
                     transaction_signature=tx_sig,
                     metadata_uri=metadata_uri,
                 )
+
+                # Anchor the credential permanently on the NeuroPass program
+                try:
+                    anchor_credential_on_chain(
+                        skill_name=skill.name,
+                        proof_hash_hex=skill.file_sha256,
+                        ipfs_cid=skill.file_ipfs_hash,
+                        mint_pubkey=SoldersPubkey.from_string(mint_addr),
+                        metadata_uri=metadata_uri,
+                    )
+                except Exception as anchor_err:
+                    # Non-fatal: NFT already minted; log and continue
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "Anchor record_credential failed (non-fatal): %s", anchor_err
+                    )
+
             except Exception as e:
                 return Response(
                     {'error': f'NFT minting failed: {e}'},
