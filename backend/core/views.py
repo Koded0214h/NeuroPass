@@ -23,7 +23,7 @@ class SkillSubmitView(generics.CreateAPIView):
     serializer_class = SkillCreateSerializer
 
     def perform_create(self, serializer):
-        from .services import validate_file_integrity, generate_solid_sha256
+        from .services import validate_file_integrity, generate_solid_sha256, check_hash_with_virustotal
         
         file_obj = self.request.FILES.get('file')
         
@@ -35,6 +35,8 @@ class SkillSubmitView(generics.CreateAPIView):
         validate_file_integrity(file_obj, ALLOWED_CONTENT_TYPES)
 
         proof = generate_solid_sha256(file_obj)
+        
+        check_hash_with_virustotal(proof)
         
         content = file_obj.read()
         ipfs_hash = upload_to_ipfs(content, file_obj.name)

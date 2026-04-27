@@ -32,3 +32,28 @@ def validate_file_integrity(file_obj, allowed_types):
         raise ValidationError({'file': f"Security Alert: File identified as {actual_mime}, which is blocked."})
     
     return actual_mime
+
+def check_hash_with_virustotal(file_hash: str):
+    url = f"https://www.virustotal.com/api/v3/files/{file_hash}"
+    headers = {
+        "accept": "application/json",
+        "x-apikey": settings.VIRUSTOTAL_API_KEY
+    }
+    
+    try:
+        resp = requests.get(url, headers=headers)
+        
+        if resp.status_code == 404:
+            return True 
+            
+        resp.raise_for_status()
+        data = resp.json()
+        
+        malicious_votes = data['data']['attributes']['last_analysis_stats']['malicious']
+        
+        if malicious_votes > 0:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'file': f'Security Alert: File flagged as malware by {malicious_votes} vendors.'})
+            
+    except requests.exceptions.RequestException:
+        pass
