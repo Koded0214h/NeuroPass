@@ -23,19 +23,22 @@ class SkillSubmitView(generics.CreateAPIView):
     serializer_class = SkillCreateSerializer
 
     def perform_create(self, serializer):
+        from .services import validate_file_integrity, generate_solid_sha256
+        
         file_obj = self.request.FILES.get('file')
+        
         if not file_obj:
             raise ValidationError({'file': 'A file upload is required.'})
-        if file_obj.content_type not in ALLOWED_CONTENT_TYPES:
-            raise ValidationError({'file': f'Unsupported file type: {file_obj.content_type}.'})
         if file_obj.size > MAX_FILE_BYTES:
             raise ValidationError({'file': 'File exceeds the 50 MB size limit.'})
 
+        validate_file_integrity(file_obj, ALLOWED_CONTENT_TYPES)
+
+        proof = generate_solid_sha256(file_obj)
+        
         content = file_obj.read()
         ipfs_hash = upload_to_ipfs(content, file_obj.name)
-        proof = sha256_hash(content)
         
-        # AI Analysis
         name = self.request.data.get('name')
         desc = self.request.data.get('description')
         ai_data = generate_skill_analysis(name, desc)
