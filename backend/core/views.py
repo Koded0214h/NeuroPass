@@ -1,10 +1,11 @@
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import Skill, Verification, Credential
 from .serializers import SkillSerializer, SkillCreateSerializer, VerificationSerializer
-from .services import upload_to_ipfs, generate_solid_sha256
+from .services import upload_to_ipfs, generate_solid_sha256, verify_onchain_sync
 from .web3 import mint_credential_nft
 from .anchor import anchor_credential_on_chain
 from .ai import generate_skill_analysis, text_to_speech_yarngpt
@@ -14,7 +15,7 @@ ALLOWED_CONTENT_TYPES = {
     'image/jpeg', 'image/png', 'image/gif',
     'application/pdf', 'text/plain', 'application/zip',
 }
-MAX_FILE_BYTES = 50 * 1024 * 1024  # 50 MB
+MAX_FILE_BYTES = 50 * 1024 * 1024
 
 
 class SkillSubmitView(generics.CreateAPIView):
@@ -33,9 +34,7 @@ class SkillSubmitView(generics.CreateAPIView):
             raise ValidationError({'file': 'File exceeds the 50 MB size limit.'})
 
         validate_file_integrity(file_obj, ALLOWED_CONTENT_TYPES)
-
         proof = generate_solid_sha256(file_obj)
-        
         check_hash_with_virustotal(proof)
         
         content = file_obj.read()
@@ -76,17 +75,12 @@ class AudioDescriptionView(generics.GenericAPIView):
         )
 
 class PassportView(generics.RetrieveAPIView):
-    """
-    Consolidated view for Frontier Pass integration.
-    Returns the full "Verifiable Identity" of a user.
-    """
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
         user = request.user
         profile = user.profile
         skills = Skill.objects.filter(user=user, status='verified').select_related('credential')
-        
         serializer = SkillSerializer(skills, many=True)
         
         return Response({
@@ -142,14 +136,12 @@ class VerificationView(generics.UpdateAPIView):
             skill.status = 'verified'
             skill.save()
 
-            # Update verifier reputation
             verifier_profile = request.user.profile
             verifier_profile.reputation_score += 1.0
             verifier_profile.save()
 
             try:
                 from solders.pubkey import Pubkey as SoldersPubkey
-
                 mint_addr, tx_sig, metadata_uri = mint_credential_nft(skill)
                 Credential.objects.create(
                     skill=skill,
@@ -158,7 +150,6 @@ class VerificationView(generics.UpdateAPIView):
                     metadata_uri=metadata_uri,
                 )
 
-                # Anchor the credential permanently on the NeuroPass program
                 try:
                     anchor_credential_on_chain(
                         skill_name=skill.name,
@@ -168,10 +159,9 @@ class VerificationView(generics.UpdateAPIView):
                         metadata_uri=metadata_uri,
                     )
                 except Exception as anchor_err:
-                    # Non-fatal: NFT already minted; log and continue
                     import logging
                     logging.getLogger(__name__).warning(
-                        "Anchor record_credential failed (non-fatal): %s", anchor_err
+                        "Anchor record_credential failed: %s", anchor_err
                     )
 
             except Exception as e:
@@ -206,3 +196,32 @@ class PublicVerifyView(generics.RetrieveAPIView):
             'mint_address': credential.mint_address,
             'metadata_uri': credential.metadata_uri,
         })
+
+class SyncCheckView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, skill_id):
+        try:
+            skill = Skill.objects.get(id=skill_id)
+            credential = getattr(skill, 'credential', None)
+            
+            if not credential:
+                return Response({
+                    "is_synchronized": False,
+                    "reason": "Not minted on-chain"
+                })
+            
+            is_valid = verify_onchain_sync(
+                credential.transaction_signature, 
+                skill.file_sha256
+            )
+            
+            return Response({
+                "is_synchronized": is_valid,
+                "db_hash": skill.file_sha256,
+                "mint_address": credential.mint_address,
+                "transaction_signature": credential.transaction_signature
+            })
+            
+        except Skill.DoesNotExist:
+            return Response({"error": "Skill not found"}, status=status.HTTP_404_NOT_FOUND)

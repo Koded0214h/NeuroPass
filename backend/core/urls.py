@@ -8,4 +8,5 @@ urlpatterns = [
     path('passport/', views.PassportView.as_view(), name='passport'),
     path('skill/<int:pk>/verify/', views.VerificationView.as_view(), name='skill-verify'),
     path('credential/<str:credential_id>/', views.PublicVerifyView.as_view(), name='public-verify'),
+    path('sync-check/<int:skill_id>/', views.SyncCheckView.as_view(), name='sync-check'),
 ]

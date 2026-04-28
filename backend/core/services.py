@@ -48,12 +48,44 @@ def check_hash_with_virustotal(file_hash: str):
             
         resp.raise_for_status()
         data = resp.json()
-        
         malicious_votes = data['data']['attributes']['last_analysis_stats']['malicious']
         
         if malicious_votes > 0:
-            from rest_framework.exceptions import ValidationError
             raise ValidationError({'file': f'Security Alert: File flagged as malware by {malicious_votes} vendors.'})
             
     except requests.exceptions.RequestException:
         pass
+
+def verify_onchain_sync(transaction_signature: str, db_hash: str) -> bool:
+    rpc_url = "https://api.devnet.solana.com"
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getTransaction",
+        "params": [
+            transaction_signature,
+            {
+                "encoding": "jsonParsed",
+                "maxSupportedTransactionVersion": 0
+            }
+        ]
+    }
+    
+    try:
+        response = requests.post(rpc_url, json=payload)
+        data = response.json()
+        
+        if "result" not in data or data["result"] is None:
+            return False
+            
+        instructions = data["result"]["transaction"]["message"]["instructions"]
+        
+        for ins in instructions:
+            if ins.get("program") == "spl-memo" or ins.get("programId") == "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr":
+                memo_content = ins.get("parsed")
+                if db_hash in str(memo_content):
+                    return True
+        
+        return False
+    except Exception:
+        return False
