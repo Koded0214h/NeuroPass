@@ -174,7 +174,7 @@ def anchor_credential_on_chain(
 
     Returns the transaction signature of the final record_credential tx.
     """
-    client = Client(settings.SOLANA_RPC)
+    client = Client(settings.SOLANA_RPC, timeout=60)
     minter = _load_minter()
     verifier = _load_verifier()
 

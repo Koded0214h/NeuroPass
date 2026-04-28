@@ -182,6 +182,23 @@ class VerificationView(generics.UpdateAPIView):
 
         return Response({'status': decision})
 
+
+class VerifierQueueView(generics.ListAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = SkillSerializer
+
+    def get_queryset(self):
+        if not self.request.user.profile.is_verifier:
+            return Skill.objects.none()
+        return (
+            Skill.objects
+            .filter(status='submitted')
+            .exclude(user=self.request.user)
+            .select_related('user', 'credential')
+            .order_by('-submitted_at')
+        )
+
+
 class PublicVerifyView(generics.RetrieveAPIView):
     permission_classes = (permissions.AllowAny,)
 
@@ -201,6 +218,39 @@ class PublicVerifyView(generics.RetrieveAPIView):
             'verifier': skill.verification.verifier.username,
             'mint_address': credential.mint_address,
             'metadata_uri': credential.metadata_uri,
+        })
+
+
+class PublicPassportView(generics.RetrieveAPIView):
+    permission_classes = (permissions.AllowAny,)
+
+    def get(self, request, username):
+        from django.contrib.auth.models import User
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        credentials = Credential.objects.select_related(
+            'skill', 'skill__verification__verifier'
+        ).filter(skill__user=user, skill__status='verified')
+
+        return Response({
+            'username': user.username,
+            'wallet_address': user.profile.wallet_address,
+            'credentials': [
+                {
+                    'skill_name': c.skill.name,
+                    'skill_level': c.skill.skill_level,
+                    'tags': c.skill.tags,
+                    'proof_hash': c.skill.file_sha256,
+                    'verifier': c.skill.verification.verifier.username,
+                    'mint_address': c.mint_address,
+                    'transaction_signature': c.transaction_signature,
+                    'minted_at': c.minted_at,
+                }
+                for c in credentials
+            ],
         })
 
 class SyncCheckView(APIView):

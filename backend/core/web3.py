@@ -71,7 +71,7 @@ def _upload_metadata_to_ipfs(metadata_json: str) -> str:
 
 
 def mint_credential_nft(skill):
-    client = Client(settings.SOLANA_RPC)
+    client = Client(settings.SOLANA_RPC, timeout=60)
     
     # Ultra-robust key parsing: Supports Base58 string or Byte Array
     try:
@@ -120,7 +120,7 @@ def mint_credential_nft(skill):
             to_pubkey=mint_pubkey,
             lamports=lamports,
             space=82,
-            program_id=TOKEN_PROGRAM_ID,
+            owner=TOKEN_PROGRAM_ID,
         )
     )
 
@@ -175,8 +175,8 @@ def mint_credential_nft(skill):
     txn.add(mint_to_ix)
     txn.add(create_meta_ix)
 
-    # Sign with both the payer and the new mint account
-    response = client.send_transaction(txn, minter, mint_keypair)
+    opts = TxOpts(skip_preflight=True, preflight_commitment='processed', skip_confirmation=False)
+    response = client.send_transaction(txn, minter, mint_keypair, opts=opts)
     tx_signature = response.value
 
     return str(mint_pubkey), str(tx_signature), metadata_uri

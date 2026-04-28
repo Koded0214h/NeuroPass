@@ -1,0 +1,528 @@
+openapi: 3.0.3
+info:
+  title: NeuroPass API
+  version: 1.0.0
+  description: Verifiable Skill Identity on Solana
+paths:
+  /api/core/credential/{credential_id}/:
+    get:
+      operationId: core_credential_retrieve
+      parameters:
+      - in: path
+        name: credential_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - core
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/core/passport/:
+    get:
+      operationId: core_passport_retrieve
+      description: |-
+        Consolidated view for Frontier Pass integration.
+        Returns the full "Verifiable Identity" of a user.
+      tags:
+      - core
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/core/skill/{id}/audio/:
+    get:
+      operationId: core_skill_audio_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - core
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/core/skill/{id}/verify/:
+    put:
+      operationId: core_skill_verify_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - core
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Verification'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Verification'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Verification'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Verification'
+          description: ''
+    patch:
+      operationId: core_skill_verify_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - core
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVerification'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedVerification'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedVerification'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Verification'
+          description: ''
+  /api/core/skill/submit/:
+    post:
+      operationId: core_skill_submit_create
+      tags:
+      - core
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SkillCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SkillCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillCreate'
+          description: ''
+  /api/core/skills/:
+    get:
+      operationId: core_skills_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - core
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSkillList'
+          description: ''
+  /api/users/login/:
+    post:
+      operationId: users_login_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/users/me/:
+    get:
+      operationId: users_me_retrieve
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserMe'
+          description: ''
+  /api/users/register/:
+    post:
+      operationId: users_register_create
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Register'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Register'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Register'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Register'
+          description: ''
+  /api/users/token/refresh/:
+    post:
+      operationId: users_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/users/wallet/:
+    put:
+      operationId: users_wallet_update
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: users_wallet_partial_update
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+components:
+  schemas:
+    Credential:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        mint_address:
+          type: string
+          readOnly: true
+        transaction_signature:
+          type: string
+          readOnly: true
+        metadata_uri:
+          type: string
+          format: uri
+          readOnly: true
+        minted_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - id
+      - metadata_uri
+      - mint_address
+      - minted_at
+      - transaction_signature
+    DecisionEnum:
+      enum:
+      - approve
+      - reject
+      type: string
+      description: |-
+        * `approve` - Approve
+        * `reject` - Reject
+    PaginatedSkillList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Skill'
+    PatchedVerification:
+      type: object
+      properties:
+        decision:
+          $ref: '#/components/schemas/DecisionEnum'
+        comment:
+          type: string
+          default: ''
+    Profile:
+      type: object
+      properties:
+        wallet_address:
+          type: string
+          maxLength: 44
+        is_verifier:
+          type: boolean
+        reputation_score:
+          type: number
+          format: double
+    Register:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+          maxLength: 128
+        wallet_address:
+          type: string
+          writeOnly: true
+          default: ''
+      required:
+      - password
+      - username
+    Skill:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        file_ipfs_hash:
+          type: string
+          readOnly: true
+        file_sha256:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          readOnly: true
+        tags:
+          readOnly: true
+        skill_level:
+          type: string
+          readOnly: true
+        submitted_at:
+          type: string
+          format: date-time
+          readOnly: true
+        credential:
+          allOf:
+          - $ref: '#/components/schemas/Credential'
+          readOnly: true
+      required:
+      - credential
+      - description
+      - file_ipfs_hash
+      - file_sha256
+      - id
+      - name
+      - skill_level
+      - status
+      - submitted_at
+      - tags
+    SkillCreate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          readOnly: true
+        tags:
+          readOnly: true
+        skill_level:
+          type: string
+          readOnly: true
+      required:
+      - description
+      - id
+      - name
+      - skill_level
+      - status
+      - tags
+    StatusEnum:
+      enum:
+      - submitted
+      - verified
+      - rejected
+      type: string
+      description: |-
+        * `submitted` - Submitted
+        * `verified` - Verified
+        * `rejected` - Rejected
+    TokenObtainPair:
+      type: object
+      properties:
+        username:
+          type: string
+          writeOnly: true
+        password:
+          type: string
+          writeOnly: true
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - password
+      - refresh
+      - username
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    UserMe:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        profile:
+          allOf:
+          - $ref: '#/components/schemas/Profile'
+          readOnly: true
+      required:
+      - id
+      - profile
+      - username
+    Verification:
+      type: object
+      properties:
+        decision:
+          $ref: '#/components/schemas/DecisionEnum'
+        comment:
+          type: string
+          default: ''
+      required:
+      - decision
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

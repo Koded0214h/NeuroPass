@@ -1,6 +1,6 @@
 import requests
 import hashlib
-import magic
+import magic 
 from django.conf import settings
 from rest_framework.exceptions import ValidationError
 

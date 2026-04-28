@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── base reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { overflow-x: hidden; cursor: none; background: #0B0805; }
+a { text-decoration: none; }
+ul { list-style: none; }
+
+/* ── custom cursor ── */
+.cursor-dot {
+  position: fixed; pointer-events: none; z-index: 9999;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #E8622A; transform: translate(-50%,-50%);
+  transition: width .25s, height .25s;
+  mix-blend-mode: screen;
+}
+.cursor-dot.big { width: 18px; height: 18px; }
+.cursor-ring {
+  position: fixed; pointer-events: none; z-index: 9998;
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid rgba(232,98,42,.5);
+  transform: translate(-50%,-50%);
+  transition: width .3s, height .3s, border-color .3s;
+}
+.cursor-ring.big { width: 56px; height: 56px; border-color: rgba(232,98,42,.25); }
+
+/* ── nav ── */
+.nav-scrolled {
+  background: rgba(11,8,5,.88) !important;
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid #2A2018;
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+}
+
+/* ── hero canvas ── */
+.hero-canvas { position:absolute; inset:0; width:100%; height:100%; opacity:.45; }
+
+/* ── title lines for slide-up ── */
+.title-line { display: block; overflow: hidden; }
+
+/* ── credential card floating parallax ── */
+.cred-card-wrap {
+  position: absolute; right: 6%; top: 50%;
+  transform: translate(0,-50%);
+  z-index: 10;
+}
+
+/* ── 3D hover on big credential card ── */
+.cred-3d {
+  transform-style: preserve-3d;
+  transition: transform .55s cubic-bezier(.16,1,.3,1);
+}
+.cred-3d:hover { transform: rotateY(6deg) rotateX(-3deg) translateY(-8px); }
+
+/* ── scroll reveal ── */
+.reveal, .reveal-l, .reveal-r {
+  opacity: 0; transition: opacity .75s ease, transform .75s ease;
+}
+.reveal   { transform: translateY(36px); }
+.reveal-l { transform: translateX(-40px); }
+.reveal-r { transform: translateX(40px); }
+.reveal.in, .reveal-l.in, .reveal-r.in { opacity:1; transform:none; }
+
+/* stagger children */
+.stagger > * {
+  opacity: 0; transform: translateY(28px);
+  transition: opacity .6s ease, transform .6s ease;
+}
+.stagger.in > *:nth-child(1) { opacity:1; transform:none; transition-delay:.00s; }
+.stagger.in > *:nth-child(2) { opacity:1; transform:none; transition-delay:.10s; }
+.stagger.in > *:nth-child(3) { opacity:1; transform:none; transition-delay:.20s; }
+.stagger.in > *:nth-child(4) { opacity:1; transform:none; transition-delay:.30s; }
+
+/* ── tech grid overlay ── */
+.tech-grid {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(7,200,181,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(7,200,181,.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* ── terminal colours ── */
+.t-comment { color: #3A3530; }
+.t-key     { color: #07C8B5; }
+.t-str     { color: #E8A85A; }
+.t-num     { color: #F2C14E; }
+.t-hash    { color: #7DCE9A; }
+.t-addr    { color: #C47AFF; }
+
+/* ── step bar ── */
+.step-bar {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, #E8622A, transparent);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform .4s ease;
+}
+.step-card:hover .step-bar { transform: scaleX(1); }
+.step-card { position: relative; overflow: hidden; }
+
+/* ── cta diagonal ── */
+.cta-stripe {
+  position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(
+    45deg, rgba(255,255,255,.025) 0, rgba(255,255,255,.025) 1px,
+    transparent 1px, transparent 58px
+  );
+}
+
+/* ── marquee ── */
+.marquee-track { display:flex; width:max-content; }
+
+/* ── skill / verify card cursor ── */
+.skill-card, .verify-card { cursor: default; }
+
+/* ── form inputs autofill fix ── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #EDE6DC;
+  -webkit-box-shadow: 0 0 0 1000px #141009 inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* ── page fade-in ── */
+main { animation: pageFade .2s ease; }
+@keyframes pageFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── scrollbar ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #0B0805; }
+::-webkit-scrollbar-thumb { background: #2A2018; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3A3028; }
