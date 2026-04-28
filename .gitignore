@@ -9,3 +9,6 @@ migrations/
 db.sqlite3
 
 txt
+node_modules/
+*.zip
+package-lock.json
