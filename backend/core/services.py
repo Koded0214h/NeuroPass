@@ -1,3 +1,4 @@
+import magic
 import requests
 import hashlib
 import magic 
@@ -24,10 +25,10 @@ def generate_solid_sha256(file_obj) -> str:
 
 def validate_file_integrity(file_obj, allowed_types):
     header = file_obj.read(2048)
-    file_obj.seek(0)  
-    
+    file_obj.seek(0)
+
     actual_mime = magic.from_buffer(header, mime=True)
-    
+
     if actual_mime not in allowed_types:
         raise ValidationError({'file': f"Security Alert: File identified as {actual_mime}, which is blocked."})
     

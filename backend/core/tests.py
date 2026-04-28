@@ -69,7 +69,8 @@ class SkillSubmitTests(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_submit_skill_disallowed_file_type_returns_400(self):
-        file = SimpleUploadedFile('virus.exe', b'bad', content_type='application/x-msdownload')
+        # Use binary content that is identified as application/octet-stream (not allowed)
+        file = SimpleUploadedFile('virus.exe', b'\x00\x01\x02\x03', content_type='application/x-msdownload')
         resp = self.client.post('/api/core/skill/submit/', {
             'name': 'Test', 'description': 'Desc', 'file': file,
         }, format='multipart')

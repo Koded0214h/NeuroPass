@@ -17,6 +17,9 @@ class Skill(models.Model):
     skill_level = models.CharField(max_length=50, blank=True, default='')
     submitted_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"{self.name} ({self.user.username})"
+
 class Verification(models.Model):
     skill = models.OneToOneField(Skill, on_delete=models.CASCADE, related_name='verification')
     verifier = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)  # user with is_verifier=True
@@ -24,12 +27,18 @@ class Verification(models.Model):
     comment = models.TextField(blank=True, default='')
     verified_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"Verification for {self.skill.name} by {self.verifier.username if self.verifier else 'Unknown'}"
+
 class Credential(models.Model):
     skill = models.OneToOneField(Skill, on_delete=models.CASCADE, related_name='credential')
     mint_address = models.CharField(max_length=44, unique=True)
     transaction_signature = models.CharField(max_length=88)
     metadata_uri = models.URLField()           # Arweave/IPFS link to metadata JSON
     minted_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Credential for {self.skill.name} ({self.mint_address[:8]}...)"
 
 class AuditLog(models.Model):
     ACTION_CHOICES = (

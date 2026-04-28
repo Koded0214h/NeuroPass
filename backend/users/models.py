@@ -9,4 +9,5 @@ class Profile(models.Model):
     nonce = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.user.username} wallet={self.wallet_address[:8]}..."
+        wallet = self.wallet_address[:8] if self.wallet_address else "None"
+        return f"{self.user.username} wallet={wallet}..."
