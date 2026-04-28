@@ -117,10 +117,9 @@ SPECTACULAR_SETTINGS = {
 }
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",       # Next.js dev server
-    "http://127.0.0.1:3000",
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
 ]
-
 CORS_ALLOW_CREDENTIALS = True
 
 # Database
@@ -129,11 +128,9 @@ CORS_ALLOW_CREDENTIALS = True
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if(DATABASE_URL):
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=DATABASE_URL
-        )
-    }
+    _db = dj_database_url.config(default=DATABASE_URL, conn_max_age=60, conn_health_checks=True)
+    _db.setdefault('OPTIONS', {})['connect_timeout'] = 30
+    DATABASES = {'default': _db}
 else:
     DATABASES = {
         'default': {

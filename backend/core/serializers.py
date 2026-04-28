@@ -27,4 +27,4 @@ class SkillCreateSerializer(serializers.ModelSerializer):
 
 class VerificationSerializer(serializers.Serializer):
     decision = serializers.ChoiceField(choices=(('approve', 'Approve'), ('reject', 'Reject')))
-    comment = serializers.CharField(required=False, default='')
+    comment = serializers.CharField(required=False, default='', allow_blank=True)
