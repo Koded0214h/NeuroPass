@@ -3,7 +3,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
-from .models import Skill, Verification, Credential
+from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
+from .models import Skill, Verification, Credential, AuditLog
 from .serializers import SkillSerializer, SkillCreateSerializer, VerificationSerializer
 from .services import upload_to_ipfs, generate_solid_sha256, verify_onchain_sync
 from .web3 import mint_credential_nft
@@ -17,11 +18,11 @@ ALLOWED_CONTENT_TYPES = {
 }
 MAX_FILE_BYTES = 50 * 1024 * 1024
 
-
 class SkillSubmitView(generics.CreateAPIView):
     permission_classes = (permissions.IsAuthenticated,)
     parser_classes = (MultiPartParser, FormParser)
     serializer_class = SkillCreateSerializer
+    throttle_classes = [UserRateThrottle, AnonRateThrottle]
 
     def perform_create(self, serializer):
         from .services import validate_file_integrity, generate_solid_sha256, check_hash_with_virustotal
@@ -54,9 +55,9 @@ class SkillSubmitView(generics.CreateAPIView):
             skill_level=ai_data.get('level', 'Intermediate'),
         )
 
-
 class AudioDescriptionView(generics.GenericAPIView):
     permission_classes = (permissions.IsAuthenticated,)
+    throttle_classes = [UserRateThrottle]
 
     def get(self, request, pk):
         try:
@@ -97,7 +98,6 @@ class PassportView(generics.RetrieveAPIView):
             'export_format': 'NeuroPass-v1',
         })
 
-
 class SkillListView(generics.ListAPIView):
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = SkillSerializer
@@ -109,7 +109,6 @@ class SkillListView(generics.ListAPIView):
             .select_related('credential', 'verification')
             .order_by('-submitted_at')
         )
-
 
 class VerificationView(generics.UpdateAPIView):
     permission_classes = (permissions.IsAuthenticated,)
@@ -129,6 +128,14 @@ class VerificationView(generics.UpdateAPIView):
         serializer.is_valid(raise_exception=True)
         decision = serializer.validated_data['decision']
         comment = serializer.validated_data.get('comment', '')
+
+        client_ip = request.META.get('REMOTE_ADDR')
+        AuditLog.objects.create(
+            action=f"VERIFY_{decision.upper()}",
+            user=request.user,
+            ip_address=client_ip,
+            details={"skill_id": skill.id, "comment": comment}
+        )
 
         Verification.objects.create(skill=skill, verifier=request.user, decision=decision, comment=comment)
 
@@ -175,7 +182,6 @@ class VerificationView(generics.UpdateAPIView):
 
         return Response({'status': decision})
 
-
 class PublicVerifyView(generics.RetrieveAPIView):
     permission_classes = (permissions.AllowAny,)
 
@@ -199,6 +205,7 @@ class PublicVerifyView(generics.RetrieveAPIView):
 
 class SyncCheckView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AnonRateThrottle]
 
     def get(self, request, skill_id):
         try:

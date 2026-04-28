@@ -30,3 +30,17 @@ class Credential(models.Model):
     transaction_signature = models.CharField(max_length=88)
     metadata_uri = models.URLField()           # Arweave/IPFS link to metadata JSON
     minted_at = models.DateTimeField(auto_now_add=True)
+
+class AuditLog(models.Model):
+    ACTION_CHOICES = (
+        ('VERIFY_APPROVE', 'Verification Approved'),
+        ('VERIFY_REJECT', 'Verification Rejected'),
+    )
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    details = models.JSONField(default=dict)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.action} by {self.user} at {self.timestamp}"

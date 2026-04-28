@@ -96,6 +96,14 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '20/minute',
+        'user': '100/minute',
+    }
 }
 
 SIMPLE_JWT = {
@@ -190,3 +198,14 @@ GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', '')
 YARNGPT_API_URL = os.getenv('YARNGPT_API_URL', 'https://yarngpt.ai/api/v1')
 YARNGPT_API_KEY = os.getenv('YARNGPT_API_KEY', '')
 VIRUSTOTAL_API_KEY = os.getenv('VIRUSTOTAL_API_KEY', '')
+
+# ==========================================
+# PHASE 5: TRANSPORT LAYER SECURITY
+# ==========================================
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
+
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net")
+CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
