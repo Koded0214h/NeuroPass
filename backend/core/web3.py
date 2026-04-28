@@ -7,7 +7,7 @@ from solders.instruction import Instruction, AccountMeta
 from solders.system_program import ID as SYS_PROGRAM_ID
 from solana.rpc.api import Client
 from solana.rpc.types import TxOpts
-from solana.transaction import Transaction
+from solders.transaction import Transaction
 from spl.token.instructions import (
     InitializeMintParams, initialize_mint,
     MintToParams, mint_to,

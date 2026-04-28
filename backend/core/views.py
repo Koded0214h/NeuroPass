@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import Skill, Verification, Credential
 from .serializers import SkillSerializer, SkillCreateSerializer, VerificationSerializer
-from .services import upload_to_ipfs, sha256_hash
+from .services import upload_to_ipfs, generate_solid_sha256
 from .web3 import mint_credential_nft
 from .anchor import anchor_credential_on_chain
 from .ai import generate_skill_analysis, text_to_speech_yarngpt

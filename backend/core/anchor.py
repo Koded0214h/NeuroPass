@@ -18,7 +18,7 @@ from solders.pubkey import Pubkey
 from solders.instruction import Instruction, AccountMeta
 from solders.system_program import ID as SYS_PROGRAM_ID
 from solana.rpc.api import Client
-from solana.transaction import Transaction
+from solders.transaction import Transaction
 
 PROGRAM_ID = Pubkey.from_string("F11FFZasp1pEGDaHoguWokQbenh7TLc5SWTz7pbDpVQD")
 
