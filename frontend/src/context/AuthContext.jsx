@@ -1,21 +1,30 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { auth, getTokens } from '../lib/api'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { useWalletModal } from '@solana/wallet-adapter-react-ui'
+import bs58 from 'bs58'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [walletAddress, setWalletAddress] = useState(null)
-  const [walletConnecting, setWalletConnecting] = useState(false)
+  const [isVerifying, setIsVerifying] = useState(false)
+  
+  const { publicKey, signMessage, disconnect, connected, wallet } = useWallet()
+  const { setVisible } = useWalletModal()
 
   const fetchMe = useCallback(async () => {
-    if (!getTokens().access) { setLoading(false); return }
+    if (!getTokens().access) { 
+      setLoading(false)
+      setUser(null)
+      return 
+    }
     try {
       const me = await auth.me()
       setUser(me)
-      if (me.profile?.wallet_address) setWalletAddress(me.profile.wallet_address)
-    } catch {
+    } catch (err) {
+      console.error("Failed to fetch user:", err)
       setUser(null)
     } finally {
       setLoading(false)
@@ -38,39 +47,67 @@ export function AuthProvider({ children }) {
   const logout = () => {
     auth.logout()
     setUser(null)
-    setWalletAddress(null)
+    if (connected) disconnect()
   }
 
-  const connectPhantom = async () => {
-    const phantom = window.solana
-    if (!phantom?.isPhantom) {
-      window.open('https://phantom.app/', '_blank')
-      throw new Error('Phantom wallet not installed')
-    }
-    setWalletConnecting(true)
+  const handleWalletAuth = async () => {
+    if (!publicKey || !signMessage) return
+    
+    setIsVerifying(true)
     try {
-      const resp = await phantom.connect()
-      const addr = resp.publicKey.toString()
-      setWalletAddress(addr)
+      const walletAddr = publicKey.toString()
+      
+      // 1. Get Nonce
+      const nonce = await auth.getNonce(walletAddr)
+      
+      // 2. Sign Message
+      const message = new TextEncoder().encode(nonce)
+      const signature = await signMessage(message)
+      const signatureBase58 = bs58.encode(signature)
+      
+      // 3. Verify on Backend
       if (user) {
-        await auth.linkWallet(addr)
+        // We are already logged in, just linking wallet
+        await auth.linkWallet(walletAddr, signatureBase58)
+        await fetchMe()
+      } else {
+        // Not logged in, performing Web3 login
+        await auth.verifyWallet(walletAddr, signatureBase58)
         await fetchMe()
       }
-      return addr
+    } catch (err) {
+      console.error("Wallet auth failed:", err)
+      throw err
     } finally {
-      setWalletConnecting(false)
+      setIsVerifying(false)
     }
   }
 
-  const disconnectPhantom = async () => {
-    if (window.solana?.isPhantom) await window.solana.disconnect()
-    setWalletAddress(null)
+  // Trigger wallet auth when wallet connects and we don't have it linked yet
+  useEffect(() => {
+    if (connected && publicKey) {
+      const currentWallet = user?.profile?.wallet_address
+      if (!currentWallet || currentWallet !== publicKey.toString()) {
+         // Auto-link or auto-login could go here, but safer to let user trigger it
+         // Or check if we are on auth page
+      }
+    }
+  }, [connected, publicKey, user])
+
+  const connectWallet = () => {
+    if (!connected) {
+      setVisible(true)
+    } else {
+      handleWalletAuth()
+    }
   }
 
   return (
     <AuthContext.Provider value={{
-      user, loading, walletAddress, walletConnecting,
-      login, register, logout, connectPhantom, disconnectPhantom, fetchMe,
+      user, loading, isVerifying,
+      walletAddress: user?.profile?.wallet_address || publicKey?.toString() || null,
+      walletConnected: connected,
+      login, register, logout, connectWallet, handleWalletAuth, fetchMe,
       isLoggedIn: !!user,
       isVerifier: user?.profile?.is_verifier ?? false,
     }}>

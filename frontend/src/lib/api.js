@@ -1,4 +1,10 @@
+import axios from 'axios';
+
 const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+const api = axios.create({
+  baseURL: BASE,
+});
 
 function getTokens() {
   return {
@@ -17,66 +23,66 @@ function clearTokens() {
   localStorage.removeItem('np_refresh')
 }
 
-async function refreshAccessToken() {
-  const { refresh } = getTokens()
-  if (!refresh) throw new Error('No refresh token')
-  const res = await fetch(`${BASE}/api/users/token/refresh/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh }),
-  })
-  if (!res.ok) { clearTokens(); throw new Error('Session expired') }
-  const data = await res.json()
-  setTokens({ access: data.access, refresh: data.refresh || refresh })
-  return data.access
-}
-
-async function request(path, opts = {}) {
-  const { access } = getTokens()
-  const headers = { ...opts.headers }
-  if (access) headers['Authorization'] = `Bearer ${access}`
-  if (!(opts.body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json'
+// Request Interceptor
+api.interceptors.request.use((config) => {
+  const { access } = getTokens();
+  if (access) {
+    config.headers.Authorization = `Bearer ${access}`;
   }
+  return config;
+}, (error) => Promise.reject(error));
 
-  let res = await fetch(`${BASE}${path}`, { ...opts, headers })
-
-  if (res.status === 401) {
-    try {
-      const newAccess = await refreshAccessToken()
-      headers['Authorization'] = `Bearer ${newAccess}`
-      res = await fetch(`${BASE}${path}`, { ...opts, headers })
-    } catch {
-      clearTokens()
-      window.location.href = '/auth'
-      throw new Error('Session expired')
+// Response Interceptor for Token Refresh
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      try {
+        const { refresh } = getTokens();
+        if (!refresh) throw new Error('No refresh token');
+        
+        const res = await axios.post(`${BASE}/api/users/token/refresh/`, { refresh });
+        const { access } = res.data;
+        setTokens({ access, refresh });
+        
+        originalRequest.headers.Authorization = `Bearer ${access}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        clearTokens();
+        window.location.href = '/auth';
+        return Promise.reject(refreshError);
+      }
     }
+    return Promise.reject(error);
   }
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Request failed' }))
-    throw Object.assign(new Error(err.detail || JSON.stringify(err)), { data: err, status: res.status })
-  }
-
-  if (res.status === 204) return null
-  return res.json()
-}
+);
 
 // ── Auth ──────────────────────────────────────────────
 export const auth = {
-  login: (username, password) =>
-    request('/api/users/login/', { method: 'POST', body: JSON.stringify({ username, password }) }).then(data => {
-      setTokens(data)
-      return data
-    }),
+  login: async (username, password) => {
+    const res = await api.post('/api/users/login/', { username, password });
+    setTokens(res.data);
+    return res.data;
+  },
 
   register: (username, email, password, wallet_address = '') =>
-    request('/api/users/register/', { method: 'POST', body: JSON.stringify({ username, email, password, wallet_address }) }),
+    api.post('/api/users/register/', { username, email, password, wallet_address }),
 
-  me: () => request('/api/users/me/'),
+  me: () => api.get('/api/users/me/').then(r => r.data),
 
-  linkWallet: (wallet_address) =>
-    request('/api/users/wallet/', { method: 'PATCH', body: JSON.stringify({ wallet_address }) }),
+  getNonce: (wallet_address) => 
+    api.post('/api/users/nonce/', { wallet_address }).then(r => r.data.nonce),
+
+  verifyWallet: async (wallet_address, signature) => {
+    const res = await api.post('/api/users/verify/', { wallet_address, signature });
+    setTokens(res.data);
+    return res.data;
+  },
+
+  linkWallet: (wallet_address, signature) =>
+    api.patch('/api/users/wallet/', { wallet_address, signature }),
 
   logout: () => clearTokens(),
 
@@ -85,32 +91,32 @@ export const auth = {
 
 // ── Skills ────────────────────────────────────────────
 export const skills = {
-  list: () => request('/api/core/skills/'),
+  list: () => api.get('/api/core/skills/').then(r => r.data),
 
   submit: (formData) =>
-    request('/api/core/skill/submit/', { method: 'POST', body: formData }),
+    api.post('/api/core/skill/submit/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
 
   audio: (id) => `${BASE}/api/core/skill/${id}/audio/`,
 }
 
 // ── Verifier ──────────────────────────────────────────
 export const verifier = {
-  queue: () => request('/api/core/skills/queue/'),
+  queue: () => api.get('/api/core/skills/queue/').then(r => r.data),
 
   decide: (id, decision, comment = '') =>
-    request(`/api/core/skill/${id}/verify/`, {
-      method: 'PATCH',
-      body: JSON.stringify({ decision, comment }),
-    }),
+    api.patch(`/api/core/skill/${id}/verify/`, { decision, comment }),
 }
 
 // ── Credentials ───────────────────────────────────────
 export const credentials = {
-  verify: (credentialId) => request(`/api/core/credential/${credentialId}/`),
+  verify: (credentialId) => api.get(`/api/core/credential/${credentialId}/`).then(r => r.data),
 
-  passport: () => request('/api/core/passport/'),
+  passport: () => api.get('/api/core/passport/').then(r => r.data),
 
-  publicPassport: (username) => fetch(`${BASE}/api/core/passport/${username}/`).then(r => r.json()),
+  publicPassport: (username) => axios.get(`${BASE}/api/core/passport/${username}/`).then(r => r.data),
 }
 
 export { setTokens, clearTokens, getTokens }
+export default api;

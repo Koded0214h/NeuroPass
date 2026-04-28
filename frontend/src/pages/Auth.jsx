@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 
 function PhantomIcon() {
   return (
@@ -16,27 +18,22 @@ export default function Auth() {
   const [form, setForm] = useState({ username: '', email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [phantomAddr, setPhantomAddr] = useState('')
-  const [walletConnecting, setWalletConnecting] = useState(false)
-  const { login, register, isLoggedIn, connectPhantom } = useAuth()
+  
+  const { login, register, isLoggedIn, handleWalletAuth, isVerifying } = useAuth()
+  const { connected, publicKey, disconnect } = useWallet()
+  const { setVisible } = useWalletModal()
   const navigate = useNavigate()
 
   useEffect(() => { if (isLoggedIn) navigate('/dashboard') }, [isLoggedIn, navigate])
 
-  const handlePhantom = async () => {
-    if (!window.solana?.isPhantom) {
-      window.open('https://phantom.app/', '_blank')
-      return
-    }
-    setWalletConnecting(true)
-    setError('')
-    try {
-      const resp = await window.solana.connect()
-      setPhantomAddr(resp.publicKey.toString())
-    } catch (e) {
-      setError('Wallet connection cancelled')
-    } finally {
-      setWalletConnecting(false)
+  const handleWalletClick = () => {
+    if (!connected) {
+      setVisible(true)
+    } else {
+      // If already connected, trigger sign-in flow
+      handleWalletAuth().catch(err => {
+        setError('Wallet verification failed')
+      })
     }
   }
 
@@ -48,16 +45,17 @@ export default function Auth() {
       if (mode === 'login') {
         await login(form.username, form.password)
       } else {
-        await register(form.username, form.email, form.password, phantomAddr)
+        await register(form.username, form.email, form.password, publicKey?.toString() || '')
       }
       navigate('/dashboard')
     } catch (err) {
-      const data = err.data || {}
+      const data = err.response?.data || err.data || {}
       const msg = data.detail
-        || data.username?.join(' ')
-        || data.email?.join(' ')
-        || data.password?.join(' ')
-        || data.non_field_errors?.join(' ')
+        || (Array.isArray(data.username) ? data.username.join(' ') : data.username)
+        || (Array.isArray(data.email) ? data.email.join(' ') : data.email)
+        || (Array.isArray(data.password) ? data.password.join(' ') : data.password)
+        || (Array.isArray(data.non_field_errors) ? data.non_field_errors.join(' ') : data.non_field_errors)
+        || err.message
         || 'Something went wrong'
       setError(msg)
     } finally {
@@ -66,6 +64,7 @@ export default function Auth() {
   }
 
   const isSignup = mode === 'signup'
+  const phantomAddr = publicKey?.toString()
 
   return (
     <div className="min-h-screen bg-brand-dark flex items-center justify-center px-4 pt-20">
@@ -92,18 +91,24 @@ export default function Auth() {
             ))}
           </div>
 
-          {/* Phantom wallet button */}
-          <button onClick={handlePhantom} disabled={walletConnecting}
+          {/* Wallet button */}
+          <button onClick={handleWalletClick} disabled={isVerifying}
             className="w-full flex items-center justify-center gap-3 border border-[#AB9FF2]/30 bg-[#AB9FF2]/10 text-[#AB9FF2] font-mono text-[11px] tracking-widest uppercase py-3.5 mb-2 hover:bg-[#AB9FF2]/20 transition-all disabled:opacity-50 rounded">
-            {walletConnecting
+            {isVerifying
               ? <span className="w-4 h-4 border border-[#AB9FF2]/40 border-t-[#AB9FF2] rounded-full animate-spin" />
               : <PhantomIcon />}
-            {walletConnecting ? 'Connecting...' : phantomAddr ? `Connected: ${phantomAddr.slice(0,8)}...` : 'Connect Phantom Wallet'}
+            {isVerifying ? 'Verifying...' : phantomAddr ? `Connected: ${phantomAddr.slice(0,8)}...` : 'Connect Wallet'}
           </button>
+          
           {phantomAddr && (
-            <p className="font-mono text-[9px] text-brand-teal text-center mb-4 tracking-widest">
-              ✓ Wallet will be linked {isSignup ? 'on registration' : 'to your account'}
-            </p>
+            <div className="flex flex-col items-center mb-4">
+              <p className="font-mono text-[9px] text-brand-teal text-center tracking-widest mb-1">
+                ✓ Wallet will be linked {isSignup ? 'on registration' : 'to your account'}
+              </p>
+              <button onClick={() => disconnect()} className="font-mono text-[8px] text-brand-muted hover:text-red-400 underline uppercase tracking-tighter">
+                Disconnect
+              </button>
+            </div>
           )}
           {!phantomAddr && <p className="font-mono text-[9px] text-brand-muted text-center mb-5 tracking-widest">Optional — link your Solana wallet</p>}
 
@@ -144,7 +149,7 @@ export default function Auth() {
               </div>
             )}
 
-            <button type="submit" disabled={loading}
+            <button type="submit" disabled={loading || isVerifying}
               className="w-full bg-brand-orange text-white font-syne font-bold text-xs tracking-widest uppercase py-4 mt-2 hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
               {loading
                 ? <><span className="w-4 h-4 border border-white/30 border-t-white rounded-full animate-spin" />Processing...</>

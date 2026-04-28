@@ -62,3 +62,4 @@ typing_extensions==4.15.0
 uritemplate==4.2.0
 urllib3==2.6.3
 websockets>=13.1
+python-magic==0.4.27

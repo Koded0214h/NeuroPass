@@ -50,7 +50,7 @@ function CredentialBadge({ skill }) {
 }
 
 export default function Profile() {
-  const { user, walletAddress, connectPhantom, walletConnecting } = useAuth()
+  const { user, walletAddress, connectWallet, isVerifying } = useAuth()
   const [passport, setPassport] = useState(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(null)
@@ -133,10 +133,10 @@ export default function Profile() {
                   </div>
                 </div>
               ) : (
-                <button onClick={connectPhantom} disabled={walletConnecting}
+                <button onClick={connectWallet} disabled={isVerifying}
                   className="w-full flex items-center justify-center gap-2 border border-[#AB9FF2]/30 bg-[#AB9FF2]/10 text-[#AB9FF2] font-mono text-[10px] tracking-widest uppercase py-3 hover:bg-[#AB9FF2]/20 transition-all disabled:opacity-50 rounded">
-                  {walletConnecting ? <span className="w-3 h-3 border border-[#AB9FF2]/30 border-t-[#AB9FF2] rounded-full animate-spin" /> : '◎'}
-                  {walletConnecting ? 'Connecting...' : 'Connect Wallet'}
+                  {isVerifying ? <span className="w-3 h-3 border border-[#AB9FF2]/30 border-t-[#AB9FF2] rounded-full animate-spin" /> : '◎'}
+                  {isVerifying ? 'Verifying...' : 'Connect Wallet'}
                 </button>
               )}
             </div>

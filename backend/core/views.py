@@ -6,7 +6,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 from .models import Skill, Verification, Credential, AuditLog
 from .serializers import SkillSerializer, SkillCreateSerializer, VerificationSerializer
-from .services import upload_to_ipfs, generate_solid_sha256, verify_onchain_sync
+from .services import upload_to_ipfs, generate_solid_sha256, verify_onchain_sync, validate_file_integrity, check_hash_with_virustotal
 from .web3 import mint_credential_nft
 from .anchor import anchor_credential_on_chain
 from .ai import generate_skill_analysis, text_to_speech_yarngpt
@@ -25,8 +25,6 @@ class SkillSubmitView(generics.CreateAPIView):
     throttle_classes = [UserRateThrottle, AnonRateThrottle]
 
     def perform_create(self, serializer):
-        from .services import validate_file_integrity, generate_solid_sha256, check_hash_with_virustotal
-        
         file_obj = self.request.FILES.get('file')
         
         if not file_obj:
