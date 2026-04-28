@@ -1,0 +1,77 @@
+NEUROPASS SECURITY (FRONTEND)
+Prepared by:
+Status: CRITICAL GAPS IDENTIFIED
+Priority: Immediate Remediation Required
+1. [CRITICAL] Web3 Identity Spoofing (Naive
+Authentication)
+Location: AuthContext.jsx (Lines 48–50) and api.js (Line 72)
+The Vulnerability
+The current implementation uses "Naive Auth.
+" The frontend simply connects to Phantom,
+retrieves a public key string, and sends that string to the backend to "link" the wallet.
+●
+The Exploit: A malicious actor can bypass the UI entirely. By calling the
+/api/users/wallet/ endpoint via the browser console or Postman with a stolen
+public key string, they can claim ownership of any high-reputation wallet (e.g., a Verifier’s
+wallet) without actually owning the private keys.
+Required Fix: Challenge-Response Nonce Flow
+We must shift from "Tell the backend my address" to "Prove I own this address.
+"
+Step A: Backend (Django)
+1. Create a /api/users/nonce/ endpoint.
+2. When called, generate a random, time-sensitive string (Nonce) and store it in the user's
+profile or cache.
+3. 4. Update the linkWallet view to require two fields: wallet_address and signature.
+Use pynacl or solders to cryptographically verify that the signature was created by
+that wallet_address signing the nonce.
+Step B: Frontend (React)
+1. 2. Request: Call /api/users/nonce/ to get the challenge string.
+Sign: Use window.solana.signMessage() to have the user sign the nonce in their
+wallet.
+3. Submit: Send the resulting signature and the public key to the backend.
+2. [HIGH] Supply Chain & Dependency Security
+A Semgrep/SCA audit has identified vulnerable libraries in the package-lock.json.
+●
+●
+●
+node-fetch (CVE-2022-0235): Vulnerable to cookie leakage during redirects.
+○
+Remedy: Update to version 2.6.7+ or 3.1.1+.
+uuid: Vulnerable to improper validation of input offsets.
+○
+Remedy: Update to uuid version 14.0.0+.
+Missing python-magic Import: In backend/core/services.py, the
+validate_file_integrity function will crash because magic is called but not
+imported.
+○
+Remedy: Add import magic to the top of services.py.
+3. [MEDIUM] Architectural Gaps & Stability
+A. The "Buffer" Crash (Vite + Solana)
+Solana’s web3.js library relies on Node.js Buffer. Vite does not provide this by default. The
+app will likely crash the moment a user attempts to sign a message or interact with the
+blockchain.
+●
+Remedy: Install vite-plugin-node-polyfills and enable it in vite.config.js.
+B. Direct window.solana Usage (Brittle Logic)
+Manually calling window.solana is insecure and does not support mobile deep-linking or
+standardized error handling.
+●
+Remedy: Refactor to use the official @solana/wallet-adapter-react and
+@solana/wallet-adapter-phantom libraries.
+C. Manual Fetch Wrapper vs. Axios
+The current request function in api.js is prone to race conditions during token refresh
+(multiple 401s firing at once).
+●
+Remedy: Migrate to Axios. Use Interceptors to automatically attach JWTs and handle
+the Nonce-based signature headers for Web3 requests.
+4. [LOW] Technical Debt & XSS Hardening
+●
+●
+Token Storage: Currently using localStorage. This is vulnerable to XSS.
+○
+Future Task: Migrate session tokens to HttpOnly Cookies.
+Redundant Imports: views.py contains duplicate imports for
+generate_solid_sha256.
+○
+Remedy: Remove the inline import on Line 28 of views.py (use the top-level
+import from Line 9).
