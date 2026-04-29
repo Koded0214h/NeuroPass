@@ -210,3 +210,10 @@ class PublicVerifyTests(APITestCase):
     def test_public_verify_requires_no_authentication(self):
         resp = self.client.get('/api/core/credential/MINTPUBKEY999/')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+
+class HealthCheckTests(APITestCase):
+    def test_health_check_returns_200(self):
+        resp = self.client.get('/health/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.json(), {"status": "healthy"})
