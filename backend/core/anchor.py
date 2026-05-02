@@ -186,43 +186,43 @@ def anchor_credential_on_chain(
     verifier_rec_key = _verifier_record_pda(verifier_pubkey)
     cred_record_key  = _credential_record_pda(mint_pubkey)
 
-    # ── Tx 1: submit_skill ────────────────────────────────────────────────────
+    from solders.message import Message
+
     skill_id        = _fetch_skill_count(client)
     skill_record_key = _skill_record_pda(minter_pubkey, skill_id)
 
-    bh = client.get_latest_blockhash().value.blockhash
-    tx1 = Transaction(recent_blockhash=bh, fee_payer=minter_pubkey)
-    tx1.add(_submit_skill_ix(
+    # 1. submit_skill instruction
+    ix1 = _submit_skill_ix(
         registry=registry_key,
         skill_record=skill_record_key,
         user=minter_pubkey,
         skill_name=skill_name,
         proof_hash=proof_hash_bytes,
         ipfs_cid=ipfs_cid,
-    ))
-    client.send_transaction(tx1, minter)
-
-    # ── Tx 2: verify_skill ────────────────────────────────────────────────────
-    bh = client.get_latest_blockhash().value.blockhash
-    tx2 = Transaction(recent_blockhash=bh, fee_payer=minter_pubkey)
-    tx2.add(_verify_skill_ix(
+    )
+    
+    # 2. verify_skill instruction
+    ix2 = _verify_skill_ix(
         verifier_record=verifier_rec_key,
         skill_record=skill_record_key,
         verifier=verifier_pubkey,
         approve=True,
-    ))
-    # Minter pays fees; verifier signs as authority — both must sign
-    client.send_transaction(tx2, minter, verifier)
+    )
 
-    # ── Tx 3: record_credential ───────────────────────────────────────────────
-    bh = client.get_latest_blockhash().value.blockhash
-    tx3 = Transaction(recent_blockhash=bh, fee_payer=minter_pubkey)
-    tx3.add(_record_credential_ix(
+    # 3. record_credential instruction
+    ix3 = _record_credential_ix(
         skill_record=skill_record_key,
         mint=mint_pubkey,
         credential_record=cred_record_key,
         user=minter_pubkey,
         metadata_uri=metadata_uri,
-    ))
-    resp = client.send_transaction(tx3, minter)
+    )
+
+    bh = client.get_latest_blockhash().value.blockhash
+    # All instructions bundled together; minter is fee payer
+    msg = Message([ix1, ix2, ix3], minter_pubkey)
+    # Both minter and verifier must sign because ix2 requires verifier as signer
+    tx = Transaction([minter, verifier], msg, bh)
+    
+    resp = client.send_transaction(tx)
     return str(resp.value)

@@ -167,16 +167,21 @@ def mint_credential_nft(skill):
         uri=metadata_uri,
     )
 
+    from solders.message import Message
+
     recent_bh = client.get_latest_blockhash().value.blockhash
-    txn = Transaction(recent_blockhash=recent_bh, fee_payer=minter_pubkey)
-    txn.add(create_mint_account_ix)
-    txn.add(create_mint_ix)
-    txn.add(create_ata_ix)
-    txn.add(mint_to_ix)
-    txn.add(create_meta_ix)
+    msg = Message([
+        create_mint_account_ix,
+        create_mint_ix,
+        create_ata_ix,
+        mint_to_ix,
+        create_meta_ix
+    ], minter_pubkey)
+
+    txn = Transaction([minter, mint_keypair], msg, recent_bh)
 
     opts = TxOpts(skip_preflight=True, preflight_commitment='processed', skip_confirmation=False)
-    response = client.send_transaction(txn, minter, mint_keypair, opts=opts)
+    response = client.send_transaction(txn, opts=opts)
     tx_signature = response.value
 
     return str(mint_pubkey), str(tx_signature), metadata_uri
